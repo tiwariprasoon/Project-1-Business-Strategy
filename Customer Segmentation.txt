@@ -1,0 +1,233 @@
+setwd("E:/R  Imp/CAPSTONES")
+
+#1. Import the input file.
+# Check if the variable with date values has been imported appropriately
+
+library(readr)
+marketing_campaign <- read.delim("E:/R  Imp/CAPSTONES/1687244086_marketing_campaign/marketing_campaign.csv")
+ View(marketing_campaign)
+ 
+Data = marketing_campaign
+View(Data)
+Data$Dt_Customer=as.Date(Data$Dt_Customer , format = '%d-%m-%Y')
+str(Data)
+
+#2.Find the variables with missing values. 
+# If the proportion of missing values is less than 5%, then delete the rows
+
+sum(is.na(Data))
+Data = na.omit(Data)
+
+
+#3.Calculate the newest and oldest customer's enrolment date in the records.
+
+sorted_data = Data[order(Data$Dt_Customer),]
+head(sorted_data$Dt_Customer,1)
+tail(sorted_data$Dt_Customer,1)
+
+#4. Create a feature "Customer_For" of the number of days 
+# the customers started to shop in the store relative to the last recorded date.
+
+Data$Customer_for = as.Date('2014-06-29') - Data$Dt_Customer
+
+#5.Find the "Age" of customers by the "Year_Birth" indicating the birth year
+
+current_year = as.numeric(format(Sys.Date(),'%Y'))
+Data$Age <- current_year-Data$Year_Birth
+
+#6. Create a feature "Spent" indicating the total amount spent by the customer 
+# in various categories over two years
+
+Data$Spent = Data$MntWines+Data$MntFruits+Data$MntMeatProducts+
+  Data$MntFishProducts+Data$MntSweetProducts+Data$MntGoldProds
+
+#7.Create another feature "Living_With" out of "Marital_Status" to extract the 
+# living situation of couples. Consider a value ‘Partner’ for the variable 
+# "Living_With" for the instances where "Marital_Status" is either “Married” or
+# “Together”. Rest all can be taken as ‘Alone’
+
+
+Data$Living_With = as.factor(ifelse(Data$Marital_Status %in% c('Married','Together'),
+                                    "Partner","Alone"))
+
+#8.Create a feature "Children" to indicate the total number of children in a 
+# household that is, kids and teenagers.
+
+Data$Children = Data$Kidhome+Data$Teenhome
+
+#9.To get further clarity on a household, create a feature indicating "Family_Size"
+
+Data$Family_Size = Data$Children + ifelse(Data$Living_With == 'Alone',1,2)
+
+
+#10.Create a feature "Is_Parent" to indicate the parenthood status
+
+Data$Is_Parent = as.factor(ifelse(Data$Children == '0',"0",'1'))
+
+#11. Keep only two categories in the field – ‘Education’ – Undergraduate, Graduate
+
+Data$Education = as.factor(ifelse(Data$Education == 'Graduation' , 'Graduate','Undergraduate'))
+
+#12. For clarity, change the name of the variables as:
+# MntWines	Wines
+# MntFruits	Fruits
+# MntMeatProducts	MeatProducts
+# MntFishProducts	FishProducts
+# MntSweetProducts	SweetsProducts
+# MntGoldProds	GoldProds
+
+colnames(Data)[10:15]=c('Wines','Fruits',
+                        'MeatProducts','FishProducts','SweetsProducts','GoldProds')
+
+#13. 13. Drop the redundant columns: "Marital_Status", "Dt_Customer", 
+# "Z_CostContact", "Z_Revenue", "Year_Birth", and "ID"
+
+
+
+Data = subset(Data, select = -c(Marital_Status, Dt_Customer, 
+                                Z_CostContact, Z_Revenue, Year_Birth,  ID) )
+
+
+#14.14. Create box plots and histograms for age and income. Identify the outliers and delete rows with outliers
+
+boxplot(Data$Income ~ Data$Age, data = Data,
+        main = "Age VS Income", xlab = "Age", ylab = "Income",
+         border = "black")
+
+
+hist(Data$Income)
+hist(Data$Age)
+
+
+#finding the outlier income row
+Data = Data[Data$Income <=153924,]
+
+#15.Find out the correlation between variables. Create a heatmap to visualize 
+# the correlation plot
+
+Data_clus = DataClus[-30]
+
+
+corr_mat = cor(Data_clus)
+heatmap(corr_mat)
+View(Data_clus)
+
+
+#16. Now you should prepare the data for cluster analysis and Categorical variables 
+# must be incorporated in clustering. Perform necessary encoding techniques to
+# transform the categorical variables.
+
+# 17. Find the appropriate number of clusters using the elbow method
+# 
+# 18. Perform cluster analysis using k-means
+# 
+# 19. After a cluster analysis is performed, it is important for the business to 
+# define the clusters. Perform cluster profiling, describe each cluster in detail,
+# and use appropriate visualizations to support your views
+
+
+
+
+
+
+
+
+
+
+library(dbscan)
+library(klaR)
+library(psych) # dummy coding
+library(fpc)
+str(Data)
+# Data$Education
+# Data$Living_With
+# Data$Is_Parent
+dummyEdu        <- as.data.frame(dummy.code(Data$Education))
+dummyLiving_With     <- as.data.frame(dummy.code(Data$Living_With))
+dummyIs_Parent <- as.data.frame(dummy.code(Data$Is_Parent))
+names(dummyEdu)         <- c('Graduate','Undergraduate')
+names(dummyLiving_With)      <- c('Alone','Partner')
+names(dummyIs_Parent)  <- c('NO','YES')
+
+dummy <- data.frame(dummyEdu,dummyLiving_With,dummyIs_Parent)
+DataClus = data.frame(Data,dummy)
+View(DataClus)
+
+DataClus$Is_Parent <- ifelse(Data$Is_Parent == 'YES' ,1,0)
+DataClus$Living_With <- ifelse(Data$Living_With == 'Alone' ,0,1)
+DataClus$Education <- ifelse(Data$Education == 'Graduate' ,1,0)
+DataClus$Customer_for <- as.numeric(DataClus$Customer_for)
+str(DataClus)
+
+
+
+vars.to.use <- NULL
+for (Var in names(DataClus)) {
+  if(class(DataClus[,Var]) == 'integer' | class(DataClus[,Var]) == 'numeric') {
+    vars.to.use <- c(vars.to.use,Var)
+  }
+}
+
+
+clusdata <-scale(DataClus[,vars.to.use])
+View(clusdata)
+View(describe(clusdata))
+
+
+wss <- (nrow(DataClus)-1)*sum(apply(DataClus,2,var));
+for (i in 2:20) wss[i] <- sum(kmeans(DataClus,centers=i)$withinss);
+options(jupyter.plot_mimetypes = "image/svg+xml");
+plot(1:20, wss, type="b", xlab="Number of Clusters",ylab="Within groups sum of squares")
+
+
+
+kmeans.c0 = 2 #set kmeans.c0 = 2 to get a solution with 2 clusters
+kmeans.c1 = 3 #set kmeans.c1 = 3 to get a solution with 3 clusters
+kmeans.c2 = 4 #set kmeans.c2 = 4 to get a solution with 4 clusters
+kmeans.c3 = 5 #set kmeans.c3 = 5 to get a solution with 5 clusters
+
+#Execute and store cluster solution
+kmeans_aa <- kmeans(DataClus,kmeans.c0,nstart=100,iter.max=100)
+kmeans_a  <- kmeans(DataClus,kmeans.c1,nstart=100,iter.max=100)
+kmeans_b  <- kmeans(DataClus,kmeans.c2,nstart=100,iter.max=100)
+kmeans_c  <- kmeans(DataClus,kmeans.c3,nstart=100,iter.max=100)
+
+groupaa =kmeans_aa$cluster
+groupa =kmeans_a$cluster
+groupb =kmeans_b$cluster
+groupc =kmeans_c$cluster
+
+Dataclusters <- data.frame(DataClus,groupaa,groupa,groupb,groupc)
+View(Dataclusters)
+
+Dataclusters$groupaa = as.factor(Dataclusters$groupaa)
+Dataclusters$groupa = as.factor(Dataclusters$groupa)
+Dataclusters$groupb = as.factor(Dataclusters$groupb)
+Dataclusters$groupc = as.factor(Dataclusters$groupc)
+
+
+clustercenters_aa <- t(aggregate(Dataclusters[,2:16],by=list(Dataclusters$groupaa),mean,na.rm=TRUE))
+clustercenters_aa <- as.data.frame(clustercenters_aa)
+names(clustercenters_aa) <- c("groupaa_c1","groupaa_c2")
+
+
+clustercenters_a <- t(aggregate(Dataclusters[,2:16],by=list(Dataclusters$groupa),mean,na.rm=TRUE))
+clustercenters_a <- as.data.frame(clustercenters_a) 
+names(clustercenters_a) <- c("groupa_c1","groupa_c2",'groupa_c3')
+
+
+clustercenters_b <- t(aggregate(Dataclusters[,2:16],by=list(Dataclusters$groupb),mean,na.rm=TRUE))
+clustercenters_b <- as.data.frame(clustercenters_b) 
+names(clustercenters_b) <- c("groupa_c1","groupa_c2",'groupa_c3','groupa_c4')
+View(clustercenters_b)
+
+clustercenters_kmeans <- data.frame(clustercenters_aa,clustercenters_a,clustercenters_b)
+View(clustercenters_kmeans)
+
+
+plot(clustercenters_b)
+plot(clustercenters_kmeans)
+
+# Solution with 4 clusters having good values an it seems with high 
+# Income value there is increase in all the spent(s) 
+
