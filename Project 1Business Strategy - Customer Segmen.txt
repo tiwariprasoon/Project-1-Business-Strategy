@@ -1,5 +1,5 @@
 Business Strategy - Customer Segmentation
-Course-end Project 1
+Project 1
 Description
 
 Problem Statement: Customer segmentation is an important technique for developing marketing strategies. It helps in better targeting and positioning customers with the company's offerings. We can perform customer personality analysis by observing their demographics and preferences.
